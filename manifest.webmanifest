@@ -1,0 +1,19 @@
+{
+  "name": "人生養成遊戲 Closed Beta",
+  "short_name": "人生養成",
+  "description": "用任務打卡、經驗值、技能樹、世界探索與背包獎勵來養成生活的 PWA。",
+  "start_url": "./index.html#today",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f0e8",
+  "theme_color": "#2f8f83",
+  "icons": [
+    {
+      "src": "./icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

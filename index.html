@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2f8f83" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="人生養成" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta
+      name="description"
+      content="人生養成遊戲 PWA：用手機打卡任務，自動累積經驗值、升等、解鎖世界探索徽章與背包。"
+    />
+    <title>人生養成遊戲 PWA Closed Beta</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/app-icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <a class="brand" href="#today">
+          <span class="mark">β</span>
+          <span><b>人生養成遊戲</b><small>Closed Beta</small></span>
+        </a>
+        <button id="resetBtn" class="ghost">重置封測資料</button>
+      </header>
+      <nav class="tabs">
+        <a href="#today">主頁</a>
+        <a href="#profile">角色</a>
+        <a href="#checkin">打卡</a>
+        <a href="#dungeon">副本</a>
+        <a href="#world">探索</a>
+        <a href="#bag">背包</a>
+        <a href="#report">報告</a>
+      </nav>
+      <main id="app"></main>
+      <nav class="bottom-tabs" aria-label="手機快速導覽">
+        <a href="#today"><span>⌂</span>主頁</a>
+        <a href="#profile"><span>◎</span>角色</a>
+        <a href="#checkin"><span>＋</span>打卡</a>
+        <a href="#dungeon"><span>▣</span>副本</a>
+        <a href="#world"><span>◇</span>探索</a>
+      </nav>
+    </div>
+    <input id="importFile" type="file" accept="application/json" hidden />
+    <div id="toastBox" class="toast-box"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
