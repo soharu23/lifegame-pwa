@@ -1,4 +1,4 @@
-const CACHE_NAME = "life-rpg-pwa-v4";
+const CACHE_NAME = "life-rpg-pwa-v9";
 const ASSETS = [
   "./",
   "./index.html",

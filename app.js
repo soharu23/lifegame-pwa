@@ -3,6 +3,8 @@ const app = document.getElementById("app");
 const toastBox = document.getElementById("toastBox");
 const resetBtn = document.getElementById("resetBtn");
 const importFile = document.getElementById("importFile");
+let introStep = 0;
+let introTypingToken = 0;
 const skills = ["語言能力", "美術能力", "身體能力", "表達能力", "創作能力", "生活掌控能力", "心靈穩定能力", "打扮能力"];
 const skillIds = ["language", "art", "body", "expression", "creation", "life", "mind", "style"];
 const skillClassById = {
@@ -153,12 +155,7 @@ const taskSeed = [
   ["超額不喝手搖飲", "BONUS", "", "身體能力", 5, 0], ["超額不吃甜點", "BONUS", "", "身體能力", 5, 0],
   ["連續7天日記", "BONUS", "", "表達能力", 3, 0],
 ].map((row, i) => ({ id: `TASK-${String(i + 1).padStart(3, "0")}`, name: row[0], category: row[1], target: row[2], skill: row[3], exp: row[4], worldExp: row[5], deleted: false }));
-const dungeonSeed = [
-  ["計劃前工作準備", "生活掌控能力", 1, 0, 1], ["高中英文句型", "語言能力", 24, 0, 1],
-  ["人物速寫練習", "美術能力", 30, 0, 1], ["英文閱讀訓練1", "語言能力", 28, 0, 1],
-  ["《挑日子》", "世界探索", 43, 0, 10], ["《魔法深化》", "世界探索", 63, 0, 10],
-  ["《塔羅牌研究所1》", "世界探索", 95, 0, 10],
-].map((row, i) => ({ id: `DUN-${String(i + 1).padStart(3, "0")}`, name: row[0], skill: row[1], total: row[2], current: row[3], worldReward: row[4], notes: "由原始 Excel 匯入", rewardClaimed: false }));
+const dungeonSeed = [];
 const defaultProfile = () => ({
   name: "麗晴",
   sign: "魔羯座",
@@ -166,14 +163,18 @@ const defaultProfile = () => ({
   tags: ["慢熱型", "只知舊番的老宅宅", "人生是場旅程"],
   freeLine: "將知識溶入血肉，具有強韌的內核、充實的內心、溫良的性格、健康的身體。",
   goal: "用喜歡的方式，把生活一點一點撿回來。",
+  goals: ["用喜歡的方式，把生活一點一點撿回來。", "", "", "", ""],
 });
-const base = () => ({ profile: defaultProfile(), skillLabels: { ...defaultSkillLabels }, tasks: taskSeed, weeklyBoard: taskSeed.slice(0, 6).map(task => task.id), dungeons: dungeonSeed, checkins: [], dungeonLogs: [], worldLogs: [] });
+const base = () => ({ introDone: false, profile: defaultProfile(), skillLabels: { ...defaultSkillLabels }, tasks: taskSeed, weeklyBoard: taskSeed.slice(0, 6).map(task => task.id), dungeons: dungeonSeed, checkins: [], dungeonLogs: [], worldLogs: [] });
 let state = load();
 let selectedDungeon = state.dungeons[0]?.id;
 function load() {
   try {
     const loaded = { ...base(), ...JSON.parse(localStorage.getItem(KEY) || "{}") };
     loaded.profile = { ...defaultProfile(), ...(loaded.profile || {}) };
+    if (!Array.isArray(loaded.profile.goals)) {
+      loaded.profile.goals = [loaded.profile.goal || "", "", "", "", ""];
+    }
     loaded.skillLabels = { ...defaultSkillLabels, ...(loaded.skillLabels || {}) };
     loaded.tasks = loaded.tasks.map(task => ({ deleted: false, ...task }));
     if (!Array.isArray(loaded.weeklyBoard)) loaded.weeklyBoard = loaded.tasks.filter(task => !task.deleted).slice(0, 6).map(task => task.id);
@@ -210,6 +211,97 @@ function world() {
 function bar(p) { return `<div class="bar"><span style="--p:${p}%"></span></div>`; }
 function stat(k, v, n = "") { return `<div class="stat"><small>${esc(k)}</small><b>${esc(v)}</b>${n ? `<div class="muted">${esc(n)}</div>` : ""}</div>`; }
 function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; toastBox.append(t); setTimeout(() => t.remove(), 3000); }
+function introText(id) {
+  const texts = {
+    one: `▓▓▓▓▓▓▓▓▓▓▓▓▓\n\n歡迎你，未來的旅行者。\n\n你的日子或許晴朗而安穩，\n也或許像晨霧裡的石板路，\n看不清前方，\n不知道自己究竟走了多遠。\n\n而此刻，\n為重新站在旅途起點的你，\n我準備了一點點的禮物。`,
+    two: `旅行者，\n希望你喜歡這份心意。\n\n或許在未來的旅途中，\n你還會收到更多不同的禮物。\n\n現在，\n請在筆記本中寫下你的名字，\n作為旅途的開始吧。`,
+  };
+  return texts[id] || "";
+}
+function typeText(el, text, done, speed = 42) {
+  const token = ++introTypingToken;
+  el.textContent = "";
+  let i = 0;
+  const tick = () => {
+    if (token !== introTypingToken) return;
+    el.textContent = text.slice(0, i);
+    i += 1;
+    if (i <= text.length) {
+      const char = text[i - 2] || "";
+      const delay = char === "\n" ? speed * 4 : /[，。]/.test(char) ? speed * 7 : speed;
+      setTimeout(tick, delay);
+    } else if (done) {
+      done();
+    }
+  };
+  tick();
+}
+function renderIntro() {
+  document.body.classList.add("intro-active");
+  app.innerHTML = introPage();
+  bindIntro();
+}
+function introPage() {
+  if (introStep === 1) {
+    return `<section class="intro-screen intro-step-2"><div class="intro-panel intro-panel-narrow"><div class="intro-lines reward-lines" id="introRewards"></div><div class="intro-type" id="introText"></div><button class="intro-next hidden" data-intro-next>筆記本自動翻開了 <span>→</span></button></div></section>`;
+  }
+  if (introStep === 2) {
+    return `<section class="intro-screen intro-step-3"><div class="notebook-wrap"><form id="introNameForm" class="notebook"><div class="paper-wear"></div><div class="journal-emblem" aria-hidden="true">✧</div><label class="notebook-label">請寫下你的名字……</label><div class="name-line"><input name="name" autocomplete="name" maxlength="24" required autofocus><span class="cursor"></span></div><p class="record-message" id="introRecord"></p><button class="intro-next notebook-submit" type="submit">建立旅途紀錄 <span>→</span></button></form></div></section>`;
+  }
+  return `<section class="intro-screen intro-step-1"><div class="intro-road"></div><div class="intro-panel"><div class="intro-type" id="introText"></div><button class="intro-next hidden" data-intro-next>伸出手 <span>→</span></button></div></section>`;
+}
+function bindIntro() {
+  const textEl = document.getElementById("introText");
+  const next = document.querySelector("[data-intro-next]");
+  if (introStep === 0 && textEl) {
+    typeText(textEl, introText("one"), () => next?.classList.remove("hidden"));
+  }
+  if (introStep === 1) {
+    const rewards = document.getElementById("introRewards");
+    const lines = ["──你獲得了背包。", "──你獲得了道具：筆記本", "──你獲得了道具：開始的勇氣與好奇心"];
+    rewards.innerHTML = lines.map(line => `<p>${esc(line)}</p>`).join("");
+    rewards.querySelectorAll("p").forEach((line, index) => {
+      line.style.animationDelay = `${0.8 + index * 1.7}s`;
+    });
+    setTimeout(() => typeText(textEl, introText("two"), () => next?.classList.remove("hidden"), 40), 6300);
+  }
+  if (introStep === 2) {
+    setTimeout(() => document.querySelector("#introNameForm input")?.focus(), 80);
+  }
+  document.querySelectorAll("[data-intro-next]").forEach(button => button.addEventListener("click", () => {
+    introStep += 1;
+    renderIntro();
+  }));
+  const introNameForm = document.getElementById("introNameForm");
+  const finishIntro = form => {
+    if (!form || form.dataset.done === "true") return;
+    const name = new FormData(form).get("name").trim();
+    if (!name) {
+      form.reportValidity?.();
+      return;
+    }
+    form.dataset.done = "true";
+    form.querySelector(".notebook-submit")?.setAttribute("disabled", "true");
+    state.profile = { ...state.profile, name };
+    state.introDone = true;
+    save();
+    const message = document.getElementById("introRecord");
+    message.textContent = "新的旅途紀錄已建立。";
+    setTimeout(() => {
+      document.body.classList.remove("intro-active");
+      location.hash = "#today";
+      render("today");
+    }, 950);
+  };
+  introNameForm?.addEventListener("submit", event => {
+    event.preventDefault();
+    finishIntro(event.currentTarget);
+  });
+  introNameForm?.querySelector(".notebook-submit")?.addEventListener("click", event => {
+    event.preventDefault();
+    finishIntro(introNameForm);
+  });
+}
 function skillId(skill) {
   if (skill === "世界探索") return "world";
   if (defaultSkillByName[skill]) return defaultSkillByName[skill];
@@ -282,6 +374,14 @@ function setProgress(did, value) {
   }
   save(); toast(`${d.name} 進度更新為 ${pct(d.current, d.total)}%`); render("dungeon");
 }
+function deleteDungeon(did) {
+  const d = state.dungeons.find(item => item.id === did);
+  if (!d) return;
+  if (!confirm(`確定刪除副本「${d.name}」嗎？已累積的副本紀錄會保留在報告中。`)) return;
+  state.dungeons = state.dungeons.filter(item => item.id !== did);
+  selectedDungeon = state.dungeons[0]?.id;
+  save(); toast("副本已刪除，過去紀錄已保留"); render("dungeon");
+}
 function taskForm(form) {
   const f = new FormData(form);
   const task = { id: `TASK-${String(state.tasks.length + 1).padStart(3, "0")}`, name: f.get("name").trim(), category: f.get("category") || "自訂", target: f.get("target") || "", skill: f.get("skill"), exp: +f.get("exp") || 0, worldExp: +f.get("worldExp") || 0, deleted: false };
@@ -343,13 +443,15 @@ function worldForm(form) {
 }
 function profileForm(form) {
   const f = new FormData(form);
+  const goals = [1, 2, 3, 4, 5].map(index => String(f.get(`goal${index}`) || "").trim());
   state.profile = {
     name: f.get("name").trim() || "未命名旅人",
     sign: f.get("sign").trim(),
     age: f.get("age").trim(),
     tags: [f.get("tag1"), f.get("tag2"), f.get("tag3")].map(v => String(v || "").trim()).filter(Boolean),
     freeLine: f.get("freeLine").trim(),
-    goal: f.get("goal").trim(),
+    goal: goals.filter(Boolean)[0] || "",
+    goals,
   };
   save(); toast("角色頁面已更新"); render("profile");
 }
@@ -400,6 +502,11 @@ function importData(file) {
 }
 function view() { return ["today", "profile", "checkin", "dungeon", "world", "bag", "report"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "today"; }
 function render(v = view()) {
+  if (!state.introDone) {
+    renderIntro();
+    return;
+  }
+  document.body.classList.remove("intro-active");
   document.querySelectorAll(".tabs a").forEach(a => a.classList.toggle("active", a.getAttribute("href") === `#${v}`));
   document.querySelectorAll(".bottom-tabs a").forEach(a => a.classList.toggle("active", a.getAttribute("href") === `#${v}`));
   app.innerHTML = pages[v]();
@@ -447,6 +554,9 @@ function profilePage() {
   const titles = w.unlocked.map(rule => rule.title);
   const items = w.unlocked.flatMap(rule => rule.items || []);
   const buffs = w.unlocked.flatMap(rule => rule.buffs || []);
+  const goalRows = (p.goals || []).filter(Boolean);
+  const buffRows = w.unlocked.flatMap(r => (r.buffs || []).map(buff => ({ ...r, text: buff })));
+  const itemRows = w.unlocked.flatMap(r => (r.items || []).map(item => ({ ...r, text: item })));
   return `<section class="view">
     <section class="panel profile-hero">
       <div>
@@ -463,9 +573,10 @@ function profilePage() {
       </div>
     </section>
     <section class="grid2">
-      <section class="form">
-        <h2>編輯角色資料</h2>
-        <form id="profileForm" class="form-grid3">
+      <section class="panel">
+        <details class="editor-details">
+          <summary class="ghost">編輯角色資料</summary>
+          <form id="profileForm" class="form-grid3">
           <label>名字<input name="name" value="${esc(p.name)}" placeholder="名字"></label>
           <label>星座<input name="sign" value="${esc(p.sign)}" placeholder="星座"></label>
           <label>年齡<input name="age" value="${esc(p.age)}" placeholder="年齡"></label>
@@ -473,13 +584,14 @@ function profilePage() {
           <label>tag 2<input name="tag2" value="${esc(p.tags[1] || "")}" placeholder="例：只知舊番的老宅宅"></label>
           <label>tag 3<input name="tag3" value="${esc(p.tags[2] || "")}" placeholder="例：人生是場旅程"></label>
           <label class="wide-field">自由描述<textarea name="freeLine">${esc(p.freeLine)}</textarea></label>
-          <label class="wide-field">理想的小目標<textarea name="goal">${esc(p.goal)}</textarea></label>
+          ${[1, 2, 3, 4, 5].map(index => `<label>理想的小目標 ${index}<input name="goal${index}" value="${esc((p.goals || [])[index - 1] || "")}" placeholder="${index === 1 ? "例：每天先完成一個最小任務" : ""}"></label>`).join("")}
           <button class="btn">儲存角色頁</button>
-        </form>
+          </form>
+        </details>
       </section>
       <section class="panel">
         <h2>理想的小目標</h2>
-        <p class="note">${esc(p.goal || "尚未填寫。")}</p>
+        ${goalRows.length ? `<ol class="goal-list">${goalRows.map(goal => `<li>${esc(goal)}</li>`).join("")}</ol>` : `<div class="empty">尚未填寫。</div>`}
         <div class="stats" style="margin-top:14px">
           ${stat("最高技能", top.skill, `${top.level.label} / ${top.exp} EXP`)}
           ${stat("已解鎖稱號", titles.length)}
@@ -488,14 +600,16 @@ function profilePage() {
         </div>
       </section>
     </section>
-    <section class="form">
-      <h2>技能名稱設定</h2>
-      <p class="note">可自由修改技能顯示名稱。世界探索是獨立系統，名稱固定不可修改。</p>
-      <form id="skillLabelsForm" class="form-grid">
+    <section class="panel">
+      <details class="editor-details">
+        <summary class="ghost">技能名稱設定</summary>
+        <p class="note">可自由修改技能顯示名稱。世界探索是獨立系統，名稱固定不可修改。</p>
+        <form id="skillLabelsForm" class="form-grid">
         ${skillIds.map(id => `<label>${esc(defaultSkillLabels[id])}<input name="${id}" value="${esc(state.skillLabels[id] || defaultSkillLabels[id])}"></label>`).join("")}
         <label>世界探索<input value="世界探索" disabled></label>
         <button class="btn">儲存技能名稱</button>
-      </form>
+        </form>
+      </details>
     </section>
     <section class="grid2">
       <section class="panel">
@@ -508,12 +622,16 @@ function profilePage() {
         <div class="chips">${["世界探索", ...skills].map(skill => skillTag(skill)).join("")}</div>
       </section>
     </section>
+    <section class="bag">
+      <section class="panel"><h2>Buff</h2><div class="list">${buffRows.map(r=>`<div class="row reward"><span class="badge">${r.badge}</span><div><b>${r.title}</b><div class="muted">${esc(r.text)}</div></div><span class="chip">Lv.${r.level}</span></div>`).join("") || `<div class="empty">尚未解鎖 Buff。</div>`}</div></section>
+      <section class="panel"><h2>道具</h2><div class="list">${itemRows.map(r=>`<div class="row reward"><span class="badge">${r.badge}</span><div><b>${esc(r.text)}</b><div class="muted">${r.title} 解鎖獎勵</div></div><span class="chip">${r.threshold} EXP</span></div>`).join("") || `<div class="empty">尚未獲得道具。</div>`}</div></section>
+    </section>
   </section>`;
 }
 function checkinPage() { return `<section class="view"><section class="form"><h1>任務與打卡</h1><p class="note">可自行新增、編輯、刪除任務。刪除任務不會影響過去已累積的 EXP。</p><form id="taskForm" class="form-grid"><label>任務名稱<input name="name" required placeholder="例：閱讀英文短文"></label><label>分類 / 頻率<input name="category" placeholder="例：每天 / 周3次 / 英語周"></label><label>目標量<input name="target" placeholder="例：1篇"></label><label>能力<select name="skill"><option value="世界探索">世界探索</option>${skillOptions()}</select></label><label>技能 EXP<input name="exp" type="number" min="0" value="1"></label><label>世界 EXP<input name="worldExp" type="number" min="0" value="0"></label><label class="checkbox-label"><input name="showOnBoard" type="checkbox" checked> 加入本周任務板</label><button class="btn">新增任務</button></form></section><section class="panel"><h2>任務資料庫</h2><div class="list">${activeTasks().map(task => taskRow(task)).join("")}</div></section><section class="panel"><h2>最近打卡</h2><div class="timeline">${state.checkins.slice(0,12).map(e=>`<div class="event"><b>${e.date}｜${esc(e.taskName)}</b><div class="muted">${esc(skillLabel(e.skill))} +${e.exp} / 世界 +${e.worldExp}</div></div>`).join("") || `<div class="empty">還沒有打卡紀錄。</div>`}</div></section></section>`; }
-function dungeonPage() { const sel = state.dungeons.find(d=>d.id===selectedDungeon) || state.dungeons[0]; return `<section class="view"><section class="panel">${sel ? `<div class="title-line"><div><h1>任務詳情</h1><p class="note">點選副本列表中的名稱會切換到這裡。</p></div><span class="chip strong">${pct(sel.current, sel.total)}%</span></div><div class="card"><h3>${esc(sel.name)}</h3><p class="note">${esc(sel.notes || "尚未填寫備註")}</p>${bar(pct(sel.current, sel.total))}<div class="stats" style="margin-top:14px">${stat("目前進度", `${sel.current}/${sel.total}`)}${stat("對應能力", skillLabel(sel.skill))}${stat("完成獎勵", `世界 +${sel.worldReward}`)}${stat("技能獲得", `${sel.skill === "世界探索" ? 0 : sel.current} EXP`)}</div></div>` : `<div class="empty">尚未建立副本。</div>`}</section><section class="panel"><h2>副本列表</h2><div class="list">${state.dungeons.map(d=>`<div class="row dungeon"><div><button class="linkbtn" data-select="${d.id}">${esc(d.name)}</button><div class="muted">${esc(skillLabel(d.skill))} / ${d.current} of ${d.total}</div></div><div>${bar(pct(d.current,d.total))}<div class="muted">${pct(d.current,d.total)}%</div></div><input type="number" min="0" max="${d.total}" value="${d.current}" data-progress="${d.id}"><button class="btn" data-save-progress="${d.id}">更新</button></div>`).join("")}</div></section><section class="form"><h2>新增任務主線副本</h2><p class="note">一本書、一套課程或一個企劃都可以是一個副本。可自行設定總等分與目前進度。</p><form id="dungeonForm" class="form-grid"><label>副本名稱<input name="name" required placeholder="例：英文閱讀訓練2"></label><label>對應能力<select name="skill"><option value="世界探索">世界探索</option>${skillOptions()}</select></label><label>總等分<input name="total" type="number" min="1" value="24"></label><label>完成獎勵世界 EXP<input name="worldReward" type="number" min="0" value="1"></label><label>備註<input name="notes" placeholder="例：一本書分成24章"></label><button class="btn">新增副本</button></form></section></section>`; }
-function worldPage() { const w = world(); return `<section class="view"><div class="hero"><section class="panel hero-main"><p class="eyebrow">世界探索 / 獨立等級</p><h1>${esc(w.level.title)}</h1><p class="note">${esc(w.level.intro || "世界探索不混入一般技能。每次達到新門檻，就會授予徽章、稱號，並把道具與 Buff 放入背包。")}</p><div class="chips"><span class="chip strong">World Lv.${w.level.level}</span><span class="chip">世界 EXP ${w.exp}</span><span class="chip">${w.next ? `下個稱號：${w.next.title}` : "目前最高等級"}</span></div></section><section class="panel"><div class="title-line"><div><h2>下一次升等</h2><p class="note">${w.next ? `還差 ${w.next.threshold - w.exp} EXP` : "目前世界獎勵全解鎖。"}</p></div><span class="badge">${w.level.badge}</span></div>${bar(w.next ? pct(w.exp - w.level.threshold, w.next.threshold - w.level.threshold) : 100)}</section></div><section class="form"><h2>新增世界探索</h2><form id="worldForm" class="form-grid3"><label>探索名稱<input name="title" required placeholder="例：去一間沒去過的店"></label><label>世界 EXP<input name="exp" type="number" min="1" value="1"></label><label>心得<input name="note" placeholder="例：比想像中不可怕"></label><button class="btn">加入探索紀錄</button></form></section><section class="grid2"><div class="panel"><h2>已解鎖世界等級</h2><div class="list">${w.unlocked.map(r=>`<div class="row reward"><span class="badge">${r.badge}</span><div><b>Lv.${r.level}｜${r.title}</b><div class="muted">${r.threshold} EXP / ${esc(r.intro || "稱號已解鎖")}</div></div><span class="chip">已解鎖</span></div>`).join("")}</div></div><div class="panel"><h2>探索紀錄</h2><div class="timeline">${state.worldLogs.slice(0,10).map(e=>`<div class="event"><b>${e.date}｜${esc(e.title)}</b><div class="muted">世界探索 +${e.exp} ${e.note ? ` / ${esc(e.note)}` : ""}</div></div>`).join("") || `<div class="empty">尚未新增世界探索紀錄。</div>`}</div></div></section></section>`; }
-function bagPage() { const w = world(); const buffRows = w.unlocked.flatMap(r => (r.buffs || []).map(buff => ({ ...r, text: buff }))); const itemRows = w.unlocked.flatMap(r => (r.items || []).map(item => ({ ...r, text: item }))); return `<section class="view"><section class="panel"><div class="title-line"><div><h1>旅人背包</h1><p class="note">Buff 和道具分開收納，不會混在一起。內容由世界探索等級自動解鎖。</p></div><span class="chip strong">${w.level.title}</span></div></section><div class="bag"><section class="panel"><h2>Buff</h2><div class="list">${buffRows.map(r=>`<div class="row reward"><span class="badge">${r.badge}</span><div><b>${r.title}</b><div class="muted">${esc(r.text)}</div></div><span class="chip">Lv.${r.level}</span></div>`).join("")}</div></section><section class="panel"><h2>道具</h2><div class="list">${itemRows.map(r=>`<div class="row reward"><span class="badge">${r.badge}</span><div><b>${esc(r.text)}</b><div class="muted">${r.title} 解鎖獎勵</div></div><span class="chip">${r.threshold} EXP</span></div>`).join("")}</div></section></div></section>`; }
+function dungeonPage() { const sel = state.dungeons.find(d=>d.id===selectedDungeon) || state.dungeons[0]; return `<section class="view"><section class="panel">${sel ? `<div class="title-line"><div><h1>任務詳情</h1><p class="note">點選副本列表中的名稱會切換到這裡。</p></div><span class="chip strong">${pct(sel.current, sel.total)}%</span></div><div class="card"><h3>${esc(sel.name)}</h3><p class="note">${esc(sel.notes || "尚未填寫備註")}</p>${bar(pct(sel.current, sel.total))}<div class="stats" style="margin-top:14px">${stat("目前進度", `${sel.current}/${sel.total}`)}${stat("對應能力", skillLabel(sel.skill))}${stat("完成獎勵", `世界 +${sel.worldReward}`)}${stat("技能獲得", `${sel.skill === "世界探索" ? 0 : sel.current} EXP`)}</div></div>` : `<div class="empty">尚未建立副本。請到下方新增第一個主線副本。</div>`}</section><section class="panel"><h2>副本列表</h2><div class="list">${state.dungeons.length ? state.dungeons.map(d=>`<div class="row dungeon"><div><button class="linkbtn" data-select="${d.id}">${esc(d.name)}</button><div class="muted">${esc(skillLabel(d.skill))} / ${d.current} of ${d.total}</div></div><div>${bar(pct(d.current,d.total))}<div class="muted">${pct(d.current,d.total)}%</div></div><input type="number" min="0" max="${d.total}" value="${d.current}" data-progress="${d.id}"><div class="row-actions"><button class="btn" data-save-progress="${d.id}">更新</button><button class="icon-btn danger-icon" data-delete-dungeon="${d.id}" type="button" title="刪除" aria-label="刪除 ${esc(d.name)}">×</button></div></div>`).join("") : `<div class="empty">副本列表目前是空的。</div>`}</div></section><section class="form"><h2>新增任務主線副本</h2><p class="note">一本書、一套課程或一個企劃都可以是一個副本。可自行設定總等分與目前進度。</p><form id="dungeonForm" class="form-grid"><label>副本名稱<input name="name" required placeholder="例：英文閱讀訓練2"></label><label>對應能力<select name="skill"><option value="世界探索">世界探索</option>${skillOptions()}</select></label><label>總等分<input name="total" type="number" min="1" value="24"></label><label>完成獎勵世界 EXP<input name="worldReward" type="number" min="0" value="1"></label><label>備註<input name="notes" placeholder="例：一本書分成24章"></label><button class="btn">新增副本</button></form></section></section>`; }
+function worldPage() { const w = world(); return `<section class="view"><div class="hero"><section class="panel hero-main"><p class="eyebrow">世界探索 / 獨立等級</p><h1>${esc(w.level.title)}</h1><p class="note">${esc(w.level.intro || "世界探索不混入一般技能。每次達到新門檻，就會授予徽章、稱號，並把道具與 Buff 放入背包。")}</p><div class="chips"><span class="chip strong">Lv.${w.level.level}</span><span class="chip">世界 EXP ${w.exp}</span></div></section><section class="panel"><div class="title-line"><div><h2>下一次升等</h2><p class="note">${w.next ? `還差 ${w.next.threshold - w.exp} EXP` : "目前世界獎勵全解鎖。"}</p></div><span class="badge">${w.level.badge}</span></div>${bar(w.next ? pct(w.exp - w.level.threshold, w.next.threshold - w.level.threshold) : 100)}</section></div><section class="form"><h2>新增世界探索紀錄</h2><form id="worldForm" class="form-grid3"><label>探索名稱<input name="title" required placeholder="例：去一間沒去過的店"></label><label>世界 EXP<input name="exp" type="number" min="1" value="1"></label><label>心得<input name="note" placeholder="例：比想像中不可怕"></label><button class="btn">加入探索紀錄</button></form></section><section class="grid2"><div class="panel"><h2>已解鎖世界等級</h2><div class="list">${w.unlocked.map(r=>`<div class="row reward"><span class="badge">${r.badge}</span><div><b>Lv.${r.level}｜${r.title}</b><div class="muted">${r.threshold} EXP / ${esc(r.intro || "稱號已解鎖")}</div></div><span class="chip">已解鎖</span></div>`).join("")}</div></div><div class="panel"><h2>探索紀錄</h2><div class="timeline">${state.worldLogs.slice(0,10).map(e=>`<div class="event"><b>${e.date}｜${esc(e.title)}</b><div class="muted">世界探索 +${e.exp} ${e.note ? ` / ${esc(e.note)}` : ""}</div></div>`).join("") || `<div class="empty">尚未新增世界探索紀錄。</div>`}</div></div></section></section>`; }
+function bagPage() { location.hash = "#profile"; return ""; }
 function reportPage() { const ss = skillStats(), w = world(), done = state.dungeons.filter(d=>d.current>=d.total).length; const events = [...state.checkins.map(e=>[e.date,e.taskName,`${e.skill} +${e.exp}`]), ...state.dungeonLogs.map(e=>[e.date,e.dungeonName,e.note]), ...state.worldLogs.map(e=>[e.date,e.title,`世界探索 +${e.exp}`])].slice(0,14); return `<section class="view"><section class="panel"><div class="title-line"><div><h1>封測報告</h1><p class="note">彙整目前累積狀態，適合截圖當 SNS 打卡週報。也可以匯出存檔，避免更換瀏覽器時資料遺失。</p></div><div class="chips"><button class="ghost" data-export>匯出存檔</button><button class="ghost" data-import>匯入存檔</button></div></div><div class="stats">${stat("總打卡", state.checkins.length)}${stat("副本數", state.dungeons.length)}${stat("完成副本", done)}${stat("世界稱號", w.level.title, `${w.exp} EXP`)}</div></section><section class="grid2"><div class="panel"><h2>能力排行榜</h2><div class="list">${ss.sort((a,b)=>b.exp-a.exp).map(skillRow).join("")}</div></div><div class="panel"><h2>最近事件</h2><div class="timeline">${events.map(e=>`<div class="event"><b>${e[0]}｜${esc(e[1])}</b><div class="muted">${esc(e[2])}</div></div>`).join("") || `<div class="empty">目前還沒有事件紀錄。</div>`}</div></div></section></section>`; }
 const pages = { today: todayPage, profile: profilePage, checkin: checkinPage, dungeon: dungeonPage, world: worldPage, bag: bagPage, report: reportPage };
 function bind() {
@@ -526,6 +644,7 @@ function bind() {
   document.querySelector("#skillLabelsForm")?.addEventListener("submit", e => { e.preventDefault(); skillLabelsForm(e.currentTarget); });
   document.querySelectorAll("[data-edit-task]").forEach(b => b.onclick = () => editTask(b.dataset.editTask));
   document.querySelectorAll("[data-delete-task]").forEach(b => b.onclick = () => deleteTask(b.dataset.deleteTask));
+  document.querySelectorAll("[data-delete-dungeon]").forEach(b => b.onclick = () => deleteDungeon(b.dataset.deleteDungeon));
   document.querySelectorAll("[data-remove-weekly]").forEach(b => b.onclick = () => removeWeeklyTask(b.dataset.removeWeekly));
   document.querySelectorAll("[data-select]").forEach(b => b.onclick = () => { selectedDungeon = b.dataset.select; render("dungeon"); });
   document.querySelectorAll("[data-save-progress]").forEach(b => b.onclick = () => setProgress(b.dataset.saveProgress, document.querySelector(`[data-progress="${b.dataset.saveProgress}"]`).value));
